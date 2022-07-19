@@ -257,4 +257,6 @@ public class MMController {
 		client.createPost(post);
 		return new ResponseEntity<>(post, HttpStatus.OK);
 	}
+	
+	//수정 체크
 }
