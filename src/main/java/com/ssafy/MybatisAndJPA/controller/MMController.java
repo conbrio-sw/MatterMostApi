@@ -6,13 +6,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ssafy.MybatisAndJPA.dto.ToDo;
+import com.ssafy.MybatisAndJPA.service.ToDoService;
 
 import net.bis5.mattermost.client4.ApiResponse;
 import net.bis5.mattermost.client4.MattermostClient;
@@ -21,18 +25,19 @@ import net.bis5.mattermost.model.ChannelList;
 import net.bis5.mattermost.model.ChannelMembers;
 import net.bis5.mattermost.model.Post;
 import net.bis5.mattermost.model.PostList;
-import net.bis5.mattermost.model.PostType;
 import net.bis5.mattermost.model.TeamList;
 import net.bis5.mattermost.model.User;
 
 @RestController
 public class MMController {
 
+	@Autowired
+	ToDoService service;
 	/* for eclipse development code */
 	@Value("${app.mm.email}")
 	String mmEmail;
-//	@Value("${app.fileupload.uploadPath2}")
-//	String uploadPath2;
+	// @Value("${app.fileupload.uploadPath2}")
+	// String uploadPath2;
 	/*
 	 * 업로드 후 upload 폴더 refresh 하거나 preferences / workspace - refresh... 2개 option
 	 * check
@@ -43,16 +48,17 @@ public class MMController {
 	private MattermostClient client;
 	@JsonIgnore
 	ApiResponse<PostList> list;
+
 	// 목록
-	//Map<String, String>
+	// Map<String, String>
 	@GetMapping(value = "/login")
 	public Map<String, String> login() {
 		String Email = mmEmail;
 		String password = mmPassword;
 		Map<String, String> map = new HashMap<>();
-		MattermostClient client;
+
 		client = MattermostClient.builder().url("https://meeting.ssafy.com").logLevel(Level.INFO)
-				.ignoreUnknownProperties().build();	
+				.ignoreUnknownProperties().build();
 		String name = client.login(Email, password).getUsername();
 		if (name != null) {
 			map.put("login", "SUCCESS");
@@ -61,7 +67,6 @@ public class MMController {
 		} else
 			map.put("login", "FAIL");
 		return map;
-		
 
 	}
 
@@ -90,7 +95,7 @@ public class MMController {
 		System.out.println("since : " + query);
 
 		list = client.getPostsSince("eoccnjbrai8a8q4kkuqt5zqyiw", since);
-		
+
 		return new ResponseEntity<>(list.readEntity(), HttpStatus.OK);
 	}
 
@@ -163,11 +168,11 @@ public class MMController {
 			arr.add(userName + " : " + map.get(orderList.get(i)).getMessage());
 		}
 
-//		for(String str : map.keySet()) {
-//			System.out.println("=============================");
-//			System.out.println(str + " : " + map.get(str));
-//			//map.get(str).getMessage();
-//		}
+		// for(String str : map.keySet()) {
+		// System.out.println("=============================");
+		// System.out.println(str + " : " + map.get(str));
+		// //map.get(str).getMessage();
+		// }
 
 		for (int i = arr.size() - 1; i > -1; i--) {
 			System.out.println(arr.get(i));
@@ -221,18 +226,19 @@ public class MMController {
 		ArrayList<Channel> rst = new ArrayList<>();
 
 		for (int i = 0; i < teamList.size(); i++) {
-			ChannelList channelList = (client.getChannelsForTeamForUser(teamList.get(i).getId(), client.getMe().readEntity().getId())
+			ChannelList channelList = (client
+					.getChannelsForTeamForUser(teamList.get(i).getId(), client.getMe().readEntity().getId())
 					.readEntity());
-			for(int j = 0; j < channelList.size(); j++) {
-				if(channelList.get(j).getTeamId().equals("")) continue;
+			for (int j = 0; j < channelList.size(); j++) {
+				if (channelList.get(j).getTeamId().equals(""))
+					continue;
 				rst.add(channelList.get(j));
 			}
 		}
 
 		return new ResponseEntity<>(rst, HttpStatus.OK);
 	}
-	
-	
+
 	@GetMapping(value = "/me")
 	public ResponseEntity<User> me() {
 		MattermostClient client;
@@ -241,23 +247,55 @@ public class MMController {
 
 		client.login(mmEmail, mmPassword);
 		User rst = client.getMe().readEntity();
-		Post post = new Post("d7dad80e-9e79-4558-a37a-628aab3c2101", "될까?");
 		return new ResponseEntity<>(rst, HttpStatus.OK);
 	}
-	
+
 	@GetMapping(value = "/post")
 	public ResponseEntity<Post> post() {
 		MattermostClient client;
 		client = MattermostClient.builder().url("https://meeting.ssafy.com").logLevel(Level.INFO)
 				.ignoreUnknownProperties().build();
 
-		client.login(mmEmail, mmPassword); 
+		client.login(mmEmail, mmPassword);
 		User rst = client.getMe().readEntity();
 		Post post = new Post("qhmimsx573fnugb3yrjtkpokao", " :dongclap:");
 		client.createPost(post);
 		return new ResponseEntity<>(post, HttpStatus.OK);
 	}
-	
-	//수정 체크
+
+	@GetMapping(value = "/createToDoList")
+	public ResponseEntity<ArrayList<ToDo>> createToDoList() {
+		MattermostClient client;
+		client = MattermostClient.builder().url("https://meeting.ssafy.com").logLevel(Level.INFO)
+				.ignoreUnknownProperties().build();
+
+		client.login(mmEmail, mmPassword);
+
+		long since = System.currentTimeMillis() - 3600000;
+		list = client.getPostsSince("qhmimsx573fnugb3yrjtkpokao", since);
+
+		ArrayList<ToDo> rst = service.createToDoList(list.readEntity());
+
+		return new ResponseEntity<>(rst, HttpStatus.OK);
+	}
+
+	@PostMapping(value = "/createNotice")
+	public ResponseEntity<String> createNotice(ToDo todo) {
+		System.out.println(todo);
+		login();
+		String notice = service.createNotice(todo);
+		System.out.println("notice : " + notice);
+		Post post = new Post("qhmimsx573fnugb3yrjtkpokao", notice);
+		client.createPost(post);
+		return new ResponseEntity<>("success", HttpStatus.OK);
+	}
+
+	@GetMapping(value = "/testNotice")
+	public ResponseEntity<String> testNotice() {
+
+		return new ResponseEntity<>("success", HttpStatus.OK);
+	}
+
+	// 수정 체크
 	// 수정 23
 }
